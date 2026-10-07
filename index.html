@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Leadkite</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { font-family: Inter, system-ui, sans-serif; }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.modal.hidden { display: none; }
+.tab-btn.active { background: #eff6ff; color: #2563eb; border-bottom: 2px solid #2563eb; }
+.chip { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 9999px; font-size: 12px; }
+.chip button { font-weight: bold; }
+</style>
+</head>
+<body class="bg-gray-50">
+<div class="flex min-h-screen">
+
+<aside class="w-64 bg-white border-r flex flex-col fixed h-screen">
+<div class="p-4 border-b">
+<div class="flex items-center gap-2">
+<div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">L</div>
+<div><div class="font-bold text-lg">Leadkite</div><div class="text-xs text-gray-500">Free Plan</div></div>
+</div>
+</div>
+<nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+<a data-page="dashboard" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100"><span class="text-sm font-medium">📊 Dashboard</span></a>
+<a data-page="forms" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100"><span class="text-sm font-medium">📝 Forms</span></a>
+<a data-page="leads" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100"><span class="text-sm font-medium">📥 Lead Inbox</span><span class="ml-auto text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full" id="leadBadge">0</span></a>
+<a data-page="campaigns" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100"><span class="text-sm font-medium">📤 Campaigns</span></a>
+<a data-page="tracking" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100"><span class="text-sm font-medium">📈 Tracking</span></a>
+<a data-page="integrations" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-gray-700 hover:bg-gray-100"><span class="text-sm font-medium">🔗 Integrations</span></a>
+</nav>
+<div class="p-3 border-t">
+<div class="bg-blue-50 rounded-lg p-3">
+<div class="text-xs text-gray-600">This month</div>
+<div class="text-sm font-bold"><span id="usageCount">0</span> / 250</div>
+</div>
+</div>
+</aside>
+
+<main class="flex-1 ml-64 p-6">
+
+<div id="page-dashboard" class="page">
+<h1 class="text-2xl font-bold mb-1">Dashboard</h1>
+<p class="text-sm text-gray-500 mb-6">Welcome back, Azmat.</p>
+<div class="grid grid-cols-4 gap-4 mb-6">
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">Total Leads</div><div class="text-2xl font-bold" id="statTotalLeads">0</div></div>
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">Valid Emails</div><div class="text-2xl font-bold text-green-600" id="statValidEmail">0</div></div>
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">Valid Phones</div><div class="text-2xl font-bold text-purple-600" id="statValidPhone">0</div></div>
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">WA Sent</div><div class="text-2xl font-bold text-emerald-600" id="statWaSent">0</div></div>
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">Email Sent</div><div class="text-2xl font-bold text-orange-600" id="statEmailSent">0</div></div>
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">WA Replies</div><div class="text-2xl font-bold text-cyan-600" id="statWaReply">0</div></div>
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">Email Replies</div><div class="text-2xl font-bold text-pink-600" id="statEmailReply">0</div></div>
+<div class="bg-white rounded-xl p-5 border"><div class="text-sm text-gray-500 mb-1">Conversion</div><div class="text-2xl font-bold text-yellow-600" id="statConversion">0%</div></div>
+</div>
+<div class="grid grid-cols-3 gap-4 mb-6">
+<div class="col-span-2 bg-white rounded-xl p-5 border"><h3 class="font-semibold mb-4">Leads Over Time</h3><canvas id="leadsChart" height="80"></canvas></div>
+<div class="bg-white rounded-xl p-5 border"><h3 class="font-semibold mb-4">Sources</h3><canvas id="sourceChart" height="180"></canvas></div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-white rounded-xl p-5 border"><h3 class="font-semibold mb-4">Recent Leads</h3><div id="recentLeads"></div></div>
+<div class="bg-white rounded-xl p-5 border"><h3 class="font-semibold mb-4">Active Forms</h3><div id="activeForms"></div></div>
+</div>
+</div>
+
+<div id="page-forms" class="page hidden">
+<div class="flex justify-between items-center mb-6">
+<div><h1 class="text-2xl font-bold">Forms <span class="text-sm text-gray-500" id="formCount">0</span></h1></div>
+<button onclick="openCreateForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Create New Form</button>
+</div>
+<div class="bg-white rounded-xl border overflow-hidden">
+<table class="w-full text-left text-sm">
+<thead class="bg-gray-50 border-b text-xs uppercase text-gray-500">
+<tr><th class="px-6 py-3">Name</th><th class="px-6 py-3">Access Key</th><th class="px-6 py-3">Created</th><th class="px-6 py-3">Submissions</th><th class="px-6 py-3">Status</th></tr>
+</thead>
+<tbody id="formsTable"></tbody>
+</table>
+</div>
+</div>
+
+<div id="page-leads" class="page hidden">
+<div class="flex justify-between items-center mb-6">
+<div><h1 class="text-2xl font-bold">Lead Inbox</h1></div>
+<div class="flex gap-2">
+<button onclick="bulkSend('whatsapp')" class="bg-green-600 text-white px-3 py-2 rounded-lg text-xs">Bulk WA</button>
+<button onclick="bulkSend('email')" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-xs">Bulk Email</button>
+<button onclick="deleteAllLeads()" class="bg-red-600 text-white px-3 py-2 rounded-lg text-xs">Delete All</button>
+</div>
+</div>
+<div class="grid grid-cols-4 gap-3 mb-4">
+<div class="bg-white rounded-lg p-3 border"><div class="text-xs text-gray-500">Total</div><div class="text-lg font-bold" id="lTotal">0</div></div>
+<div class="bg-white rounded-lg p-3 border"><div class="text-xs text-gray-500">Valid</div><div class="text-lg font-bold text-green-600" id="lValid">0</div></div>
+<div class="bg-white rounded-lg p-3 border"><div class="text-xs text-gray-500">Invalid</div><div class="text-lg font-bold text-red-600" id="lInvalid">0</div></div>
+<div class="bg-white rounded-lg p-3 border"><div class="text-xs text-gray-500">Replied</div><div class="text-lg font-bold text-blue-600" id="lReplied">0</div></div>
+</div>
+<div class="bg-white rounded-xl border overflow-hidden">
+<table class="w-full text-left text-sm">
+<thead class="bg-gray-50 border-b text-xs uppercase text-gray-500">
+<tr><th class="px-4 py-3">Name</th><th class="px-4 py-3">Contact</th><th class="px-4 py-3">Source</th><th class="px-4 py-3">Validation</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">Action</th></tr>
+</thead>
+<tbody id="leadsTable"></tbody>
+</table>
+</div>
+</div>
+
+<div id="page-campaigns" class="page hidden">
+<h1 class="text-2xl font-bold mb-1">Campaigns</h1>
+<p class="text-sm text-gray-500 mb-6">Send bulk messages</p>
+<div class="bg-white rounded-xl border">
+<div class="flex border-b overflow-x-auto">
+<button onclick="showCampTab('whatsapp')" data-ctab="whatsapp" class="tab-btn px-5 py-3 text-sm whitespace-nowrap">WhatsApp</button>
+<button onclick="showCampTab('email')" data-ctab="email" class="tab-btn px-5 py-3 text-sm whitespace-nowrap">Email</button>
+<button onclick="showCampTab('telegram')" data-ctab="telegram" class="tab-btn px-5 py-3 text-sm whitespace-nowrap">Telegram</button>
+<button onclick="showCampTab('facebook')" data-ctab="facebook" class="tab-btn px-5 py-3 text-sm whitespace-nowrap">Facebook</button>
+<button onclick="showCampTab('instagram')" data-ctab="instagram" class="tab-btn px-5 py-3 text-sm whitespace-nowrap">Instagram</button>
+</div>
+<div class="p-6">
+
+<div id="ctab-whatsapp" class="camp-content">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<div>
+<h3 class="font-semibold mb-3">WhatsApp Template</h3>
+<label class="block text-sm font-semibold mb-1">Template Name</label>
+<input id="waTemplateName" placeholder="e.g., Diwali Offer" class="w-full border rounded-lg px-3 py-2 text-sm mb-3" />
+<label class="block text-sm font-semibold mb-1">Content</label>
+<div class="border rounded-t-lg bg-gray-50 p-2 flex flex-wrap gap-1">
+<button type="button" onclick="waFormat('bold')" class="px-2 py-1 hover:bg-gray-200 rounded font-bold text-sm">B</button>
+<button type="button" onclick="waFormat('italic')" class="px-2 py-1 hover:bg-gray-200 rounded italic text-sm">I</button>
+<button type="button" onclick="waFormat('underline')" class="px-2 py-1 hover:bg-gray-200 rounded underline text-sm">U</button>
+<button type="button" onclick="waFormat('insertUnorderedList')" class="px-2 py-1 hover:bg-gray-200 rounded text-sm">• List</button>
+<button type="button" onclick="waInsertLink()" class="px-2 py-1 hover:bg-gray-200 rounded text-sm">🔗</button>
+<button type="button" onclick="waInsertEmoji()" class="px-2 py-1 hover:bg-gray-200 rounded text-sm">😀</button>
+</div>
+<div id="waTemplateContent" contenteditable="true" class="border border-t-0 rounded-b-lg p-3 min-h-[200px] text-sm focus:outline-none" style="background:#fff;">Hi <strong>{{name}}</strong>,<br><br>We have a special offer for you!<br><br>Thanks,<br>Arfina Team</div>
+<div class="mt-3 relative">
+<button type="button" onclick="toggleWaVarMenu()" class="border rounded-lg px-3 py-1.5 text-sm">+ Variables ▾</button>
+<div id="waVarMenu" class="hidden absolute left-0 mt-1 bg-white border rounded-lg shadow-lg z-10 w-48">
+<a onclick="waInsertVar('name')" class="block px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer">{{name}}</a>
+<a onclick="waInsertVar('phone')" class="block px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer">{{phone}}</a>
+<a onclick="waInsertVar('email')" class="block px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer">{{email}}</a>
+<a onclick="waInsertVar('company')" class="block px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer">{{company}}</a>
+</div>
+</div>
+<div class="mt-4 flex gap-2">
+<button onclick="sendWaCampaign()" class="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium">Send to All Numbers</button>
+</div>
+<div id="waLog" class="mt-3"></div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-3">
+<h3 class="font-semibold">WhatsApp Numbers</h3>
+<span class="text-xs text-gray-500"><span id="waCount">0</span> numbers</span>
+</div>
+<div class="flex border-b mb-3">
+<button type="button" onclick="showWaAddTab('single')" data-watab="single" class="wa-add-tab px-3 py-2 text-xs font-medium border-b-2 border-blue-600 text-blue-600">Single</button>
+<button type="button" onclick="showWaAddTab('bulk')" data-watab="bulk" class="wa-add-tab px-3 py-2 text-xs font-medium text-gray-500">Bulk</button>
+<button type="button" onclick="showWaAddTab('file')" data-watab="file" class="wa-add-tab px-3 py-2 text-xs font-medium text-gray-500">File</button>
+</div>
+<div id="wa-add-single" class="wa-add-content">
+<input id="newWaName" placeholder="Contact name" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" />
+<input id="newWaNumber" placeholder="10-digit number" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" />
+<button onclick="submitAddWa()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm">+ Add Number</button>
+</div>
+<div id="wa-add-bulk" class="wa-add-content hidden">
+<textarea id="bulkWaInput" rows="6" placeholder="9876543210,John" class="w-full border rounded-lg px-3 py-2 text-sm mb-2 font-mono text-xs"></textarea>
+<button onclick="bulkAddWa()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm">Import All</button>
+</div>
+<div id="wa-add-file" class="wa-add-content hidden">
+<label class="block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50">
+<input type="file" id="waFileInput" accept=".csv,.txt" onchange="handleWaFile(this)" class="hidden" />
+<div class="text-3xl mb-2">📁</div>
+<div class="text-sm">Click to upload CSV</div>
+</label>
+<div id="waFilePreview" class="mt-3"></div>
+</div>
+<div class="mt-4">
+<div class="flex justify-between items-center mb-2">
+<h4 class="text-sm font-semibold">Added Numbers</h4>
+<input id="waSearch" oninput="renderWaList()" placeholder="🔍" class="border rounded px-2 py-1 text-xs w-24" />
+</div>
+<div class="border rounded-lg max-h-[300px] overflow-y-auto" id="waList"></div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="ctab-email" class="camp-content hidden">
+<div class="border rounded-xl overflow-hidden bg-white">
+<div class="border-b">
+<div class="flex items-center px-4 py-3 border-b">
+<span class="text-sm text-gray-500 w-16">From</span>
+<input id="emailFrom" value="hello@arfina.com" class="flex-1 text-sm focus:outline-none" />
+</div>
+<div class="flex items-center px-4 py-3 border-b">
+<span class="text-sm text-gray-500 w-16">To</span>
+<div class="flex-1 flex items-center gap-2 flex-wrap">
+<div id="emailChips" class="flex flex-wrap gap-1"></div>
+<button type="button" onclick="openEmailPicker()" class="text-blue-600 text-sm hover:underline">+ Add recipients</button>
+</div>
+</div>
+<div class="flex items-center px-4 py-3">
+<span class="text-sm text-gray-500 w-16">Subject</span>
+<input id="emailSubject" placeholder="Type subject here..." class="flex-1 text-sm focus:outline-none" />
+</div>
+</div>
+<div class="bg-gray-50 border-b p-2 flex flex-wrap gap-1">
+<button type="button" onclick="emailFormat('bold')" class="px-2 py-1 hover:bg-gray-200 rounded font-bold text-sm">B</button>
+<button type="button" onclick="emailFormat('italic')" class="px-2 py-1 hover:bg-gray-200 rounded italic text-sm">I</button>
+<button type="button" onclick="emailFormat('underline')" class="px-2 py-1 hover:bg-gray-200 rounded underline text-sm">U</button>
+<button type="button" onclick="emailInsertLink()" class="px-2 py-1 hover:bg-gray-200 rounded text-sm">🔗</button>
+<button type="button" onclick="emailInsertEmoji()" class="px-2 py-1 hover:bg-gray-200 rounded text-sm">😀</button>
+<div class="relative ml-2">
+<button type="button" onclick="toggleEmailVarMenu()" class="border rounded px-2 py-1 text-xs">+ Variables ▾</button>
+<div id="emailVarMenu" class="hidden absolute left-0 mt-1 bg-white border rounded-lg shadow-lg z-10 w-48">
+<a onclick="emailInsertVar('name')" class="block px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer">{{name}}</a>
+<a onclick="emailInsertVar('email')" class="block px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer">{{email}}</a>
+<a onclick="emailInsertVar('company')" class="block px-3 py-2 hover:bg-gray-100 text-sm cursor-pointer">{{company}}</a>
+</div>
+</div>
+</div>
+<div id="emailBody" contenteditable="true" class="p-4 min-h-[300px] text-sm focus:outline-none" style="background:#fff;">Hi <strong>{{name}}</strong>,<br><br>Hope you're doing well!<br><br>Best,<br>Team</div>
+<div class="border-t bg-gray-50 px-4 py-3 flex items-center justify-end gap-2">
+<button type="button" onclick="deleteEmailDraft()" class="border rounded-lg px-3 py-1.5 text-sm text-red-600">Delete</button>
+<button type="button" onclick="sendEmailCampaign()" class="bg-blue-600 text-white rounded-lg px-4 py-1.5 text-sm">Send</button>
+</div>
+</div>
+<div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+<div>
+<div class="flex justify-between items-center mb-2">
+<h3 class="font-semibold text-sm">Email Contacts</h3>
+<span class="text-xs text-gray-500"><span id="emailCount">0</span> contacts</span>
+</div>
+<div class="flex border-b mb-2">
+<button type="button" onclick="showEmailAddTab('single')" data-etab="single" class="email-add-tab px-3 py-1.5 text-xs font-medium border-b-2 border-blue-600 text-blue-600">Single</button>
+<button type="button" onclick="showEmailAddTab('bulk')" data-etab="bulk" class="email-add-tab px-3 py-1.5 text-xs font-medium text-gray-500">Bulk</button>
+<button type="button" onclick="showEmailAddTab('file')" data-etab="file" class="email-add-tab px-3 py-1.5 text-xs font-medium text-gray-500">File</button>
+</div>
+<div id="email-add-single" class="email-add-content">
+<input id="newEmailName" placeholder="Name" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" />
+<input id="newEmailCompany" placeholder="Company" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" />
+<input id="newEmailAddress" placeholder="email@example.com" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" />
+<button onclick="submitAddEmail()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm">+ Add Contact</button>
+</div>
+<div id="email-add-bulk" class="email-add-content hidden">
+<textarea id="bulkEmailInput" rows="6" placeholder="john@abc.com,John" class="w-full border rounded-lg px-3 py-2 text-sm mb-2 font-mono text-xs"></textarea>
+<button onclick="bulkAddEmail()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm">Import All</button>
+</div>
+<div id="email-add-file" class="email-add-content hidden">
+<label class="block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50">
+<input type="file" id="emailFileInput" accept=".csv,.txt" onchange="handleEmailFile(this)" class="hidden" />
+<div class="text-3xl mb-2">📁</div>
+<div class="text-sm">Click to upload CSV</div>
+</label>
+<div id="emailFilePreview" class="mt-3"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-2">
+<h4 class="text-sm font-semibold">All Contacts</h4>
+<input id="emailSearch" oninput="renderEmailList()" placeholder="🔍" class="border rounded px-2 py-1 text-xs w-24" />
+</div>
+<div class="border rounded-lg max-h-[300px] overflow-y-auto" id="emailList"></div>
+</div>
+</div>
+<div id="emailLog" class="mt-4"></div>
+</div>
+
+<div id="ctab-telegram" class="camp-content hidden">
+<h3 class="font-semibold mb-3">Telegram</h3>
+<textarea rows="6" placeholder="Hi {name}..." class="w-full border rounded-lg px-3 py-2 text-sm mb-3"></textarea>
+<button class="bg-sky-500 text-white px-6 py-2.5 rounded-lg text-sm">Send</button>
+</div>
+<div id="ctab-facebook" class="camp-content hidden">
+<h3 class="font-semibold mb-3">Facebook Groups</h3>
+<textarea rows="5" placeholder="Post content..." class="w-full border rounded-lg px-3 py-2 text-sm mb-3"></textarea>
+<button class="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm">Post</button>
+</div>
+<div id="ctab-instagram" class="camp-content hidden">
+<h3 class="font-semibold mb-3">Instagram</h3>
+<textarea rows="5" placeholder="DM content..." class="w-full border rounded-lg px-3 py-2 text-sm mb-3"></textarea>
+<button class="bg-pink-600 text-white px-6 py-2.5 rounded-lg text-sm">DM All</button>
+</div>
+
+</div>
+</div>
+</div>
+
+<div id="page-tracking" class="page hidden">
+<h1 class="text-2xl font-bold mb-6">Tracking</h1>
+<div class="bg-white rounded-xl border">
+<div class="flex border-b overflow-x-auto">
+<button onclick="showTrackTab('whatsapp')" data-ttab="whatsapp" class="tab-btn px-5 py-3 text-sm">WhatsApp</button>
+<button onclick="showTrackTab('email')" data-ttab="email" class="tab-btn px-5 py-3 text-sm">Email</button>
+</div>
+<div class="p-6">
+<div id="ttab-whatsapp" class="track-content">
+<div class="grid grid-cols-5 gap-3 mb-6">
+<div class="bg-emerald-50 rounded-lg p-3 text-center"><div class="text-xs">Sent</div><div class="text-xl font-bold" id="waTSent">0</div></div>
+<div class="bg-emerald-50 rounded-lg p-3 text-center"><div class="text-xs">Delivered</div><div class="text-xl font-bold" id="waTDelivered">0</div></div>
+<div class="bg-emerald-50 rounded-lg p-3 text-center"><div class="text-xs">Read</div><div class="text-xl font-bold" id="waTRead">0</div></div>
+<div class="bg-emerald-50 rounded-lg p-3 text-center"><div class="text-xs">Replied</div><div class="text-xl font-bold" id="waTReplied">0</div></div>
+<div class="bg-emerald-50 rounded-lg p-3 text-center"><div class="text-xs">Rate</div><div class="text-xl font-bold" id="waTRate">0%</div></div>
+</div>
+<table class="w-full text-sm"><thead class="bg-gray-50 border-b text-xs uppercase text-gray-500"><tr><th class="px-4 py-2 text-left">Lead</th><th class="px-4 py-2 text-left">Phone</th><th class="px-4 py-2">Sent</th><th class="px-4 py-2">Delivered</th><th class="px-4 py-2">Read</th><th class="px-4 py-2">Replied</th></tr></thead><tbody id="waTrackTable"></tbody></table>
+</div>
+<div id="ttab-email" class="track-content hidden">
+<div class="grid grid-cols-5 gap-3 mb-6">
+<div class="bg-blue-50 rounded-lg p-3 text-center"><div class="text-xs">Sent</div><div class="text-xl font-bold" id="emTSent">0</div></div>
+<div class="bg-blue-50 rounded-lg p-3 text-center"><div class="text-xs">Delivered</div><div class="text-xl font-bold" id="emTDelivered">0</div></div>
+<div class="bg-blue-50 rounded-lg p-3 text-center"><div class="text-xs">Opened</div><div class="text-xl font-bold" id="emTOpened">0</div></div>
+<div class="bg-blue-50 rounded-lg p-3 text-center"><div class="text-xs">Clicked</div><div class="text-xl font-bold" id="emTClicked">0</div></div>
+<div class="bg-blue-50 rounded-lg p-3 text-center"><div class="text-xs">Replied</div><div class="text-xl font-bold" id="emTReplied">0</div></div>
+</div>
+<table class="w-full text-sm"><thead class="bg-gray-50 border-b text-xs uppercase text-gray-500"><tr><th class="px-4 py-2 text-left">Lead</th><th class="px-4 py-2 text-left">Email</th><th class="px-4 py-2">Sent</th><th class="px-4 py-2">Opened</th><th class="px-4 py-2">Clicked</th><th class="px-4 py-2">Replied</th></tr></thead><tbody id="emTrackTable"></tbody></table>
+</div>
+</div>
+</div>
+</div>
+
+<div id="page-integrations" class="page hidden">
+<h1 class="text-2xl font-bold mb-1">Integrations</h1>
+<p class="text-sm text-gray-500 mb-6">Connect services</p>
+<div class="space-y-3" id="integrationsList"></div>
+</div>
+
+</main>
+</div>
+
+<div id="createFormModal" class="modal hidden">
+<div class="bg-white rounded-2xl p-8 max-w-lg w-full mx-4">
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-xl font-bold">Create New Form</h3>
+<button onclick="closeCreateForm()" class="text-gray-400 text-2xl">&times;</button>
+</div>
+<div class="space-y-4">
+<div><label class="block text-sm font-semibold mb-1">Form Name</label><input id="newFormName" placeholder="Contact Form" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+<div><label class="block text-sm font-semibold mb-1">Website URL</label><input id="newFormWebsite" placeholder="mywebsite.com" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+<div><label class="block text-sm font-semibold mb-1">Notify Email</label><input id="newFormEmail" value="md.alikhan42@gmail.com" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+</div>
+<div class="flex justify-end gap-3 mt-6">
+<button onclick="closeCreateForm()" class="px-5 py-2 text-sm">Cancel</button>
+<button onclick="submitCreateForm()" class="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm">Create Form</button>
+</div>
+</div>
+</div>
+
+<div id="emailPickerModal" class="modal hidden">
+<div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-lg font-bold">Add Recipients</h3>
+<button onclick="closeEmailPicker()" class="text-gray-400 text-2xl">&times;</button>
+</div>
+<input id="emailPickerSearch" oninput="renderEmailPickerList()" placeholder="Search..." class="w-full border rounded-lg px-3 py-2 text-sm mb-3" />
+<div id="emailPickerList" class="max-h-64 overflow-y-auto border rounded-lg mb-4"></div>
+<div class="flex justify-end gap-2">
+<button onclick="closeEmailPicker()" class="px-4 py-2 text-sm border rounded-lg">Cancel</button>
+<button onclick="confirmEmailRecipients()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">Add Selected</button>
+</div>
+</div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
