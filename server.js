@@ -1,8 +1,9 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const app = express();
 
-// ===== CORS =====
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -12,10 +13,21 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// ===== DATA =====
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) { cb(null, uploadsDir); },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_'));
+  }
+});
+const upload = multer({ storage: storage, limits: { fileSize: 50 * 1024 * 1024 } });
+app.use('/uploads', express.static(uploadsDir));
+
 let forms = [
   { id: '1', name: 'Leads Interior', accessKey: '116d49db_b6a3', website: 'localhost:5500', created: '2026-10-07', submissions: 3, status: 'Active', notifyEmail: 'md.alikhan42@gmail.com' },
   { id: '2', name: 'Arfina Website', accessKey: 'v8rsjavu_rvmc', website: 'localhost:8000', created: '2026-10-06', submissions: 5, status: 'Active', notifyEmail: 'md.alikhan42@gmail.com' },
@@ -55,40 +67,73 @@ let emailContacts = [
   { id: '4', email: 'priya@gmail.com', name: 'Priya Singh', company: 'Kitchen World' }
 ];
 
+let waCampaigns = [];
+let connectedIntegrations = {
+  googleSheets: { connected: false, url: '' },
+  whatsapp: { connected: false, number: '' }
+};
+let userProfile = {
+  name: 'Azmat Khan',
+  email: 'md.alikhan42@gmail.com',
+  image: ''
+};
+
 function validateEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e || ''); }
 function validatePhone(p) { return /^[6-9]\d{9}$/.test(p || ''); }
 
-// ===== SSE (Real-time) =====
 let sseClients = [];
-
 app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.flushHeaders();
-  
   sseClients.push(res);
-  
-  req.on('close', () => {
-    sseClients = sseClients.filter(c => c !== res);
-  });
+  req.on('close', () => { sseClients = sseClients.filter(c => c !== res); });
 });
-
 function notifyClients(data) {
   sseClients.forEach(client => {
-    try {
-      client.write('data: ' + JSON.stringify(data) + '\n\n');
-    } catch(e) {}
+    try { client.write('data: ' + JSON.stringify(data) + '\n\n'); } catch (e) {}
   });
 }
 
-// ===== API ROUTES =====
 app.get('/api/forms', (req, res) => res.json(forms));
 app.get('/api/leads', (req, res) => res.json(leads));
 app.get('/api/integrations', (req, res) => res.json(integrations));
 app.get('/api/wa-numbers', (req, res) => res.json(waNumbers));
 app.get('/api/email-contacts', (req, res) => res.json(emailContacts));
+app.get('/api/wa-campaigns', (req, res) => res.json(waCampaigns));
+app.get('/api/integrations/status', (req, res) => res.json(connectedIntegrations));
+app.get('/api/profile', (req, res) => res.json(userProfile));
+
+app.get('/api/chart-data', (req, res) => {
+  var days = [];
+  var counts = [];
+  var now = new Date();
+  for (var i = 6; i >= 0; i--) {
+    var d = new Date(now);
+    d.setDate(d.getDate() - i);
+    var dateStr = d.toISOString().split('T')[0];
+    days.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+    var count = leads.filter(function(l) { return l.createdAt === dateStr; }).length;
+    counts.push(count);
+  }
+  var sources = {};
+  leads.forEach(function(l) {
+    sources[l.source] = (sources[l.source] || 0) + 1;
+  });
+  res.json({
+    leadsOverTime: { labels: days, data: counts },
+    sources: { labels: Object.keys(sources), data: Object.values(sources) }
+  });
+});
+
+app.post('/api/profile', (req, res) => {
+  if (req.body.name) userProfile.name = req.body.name;
+  if (req.body.email) userProfile.email = req.body.email;
+  if (req.body.image !== undefined) userProfile.image = req.body.image;
+  res.json(userProfile);
+});
 
 app.post('/api/forms', (req, res) => {
   const key = Math.random().toString(36).substring(2, 10) + '_' + Math.random().toString(36).substring(2, 6);
@@ -106,6 +151,21 @@ app.post('/api/forms', (req, res) => {
   res.json(newForm);
 });
 
+app.put('/api/forms/:id', (req, res) => {
+  const f = forms.find(x => x.id === req.params.id);
+  if (!f) return res.status(404).json({ error: 'Form not found' });
+  if (req.body.name) f.name = req.body.name;
+  if (req.body.website !== undefined) f.website = req.body.website;
+  if (req.body.notifyEmail !== undefined) f.notifyEmail = req.body.notifyEmail;
+  if (req.body.status) f.status = req.body.status;
+  res.json(f);
+});
+
+app.delete('/api/forms/:id', (req, res) => {
+  forms = forms.filter(f => f.id !== req.params.id);
+  res.json({ success: true });
+});
+
 app.delete('/api/leads/:id', (req, res) => {
   leads = leads.filter(l => l.id !== req.params.id);
   res.json({ success: true });
@@ -116,33 +176,79 @@ app.delete('/api/leads', (req, res) => {
   res.json({ success: true });
 });
 
-// ===== WEBHOOK - Form Submit =====
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  res.json({ success: true, url: '/uploads/' + req.file.filename, filename: req.file.filename, size: req.file.size, mimetype: req.file.mimetype });
+});
+
+app.get('/api/leads/export', (req, res) => {
+  res.json({ exportedAt: new Date().toISOString(), totalLeads: leads.length, leads: leads });
+});
+
+app.post('/api/leads/import', (req, res) => {
+  const imported = req.body.leads || [];
+  if (!Array.isArray(imported)) return res.status(400).json({ error: 'Invalid data' });
+  let added = 0;
+  imported.forEach(item => {
+    if (item.name && (item.email || item.phone)) {
+      leads.push({
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+        formId: item.formId || 'imported',
+        name: item.name, email: item.email || '', phone: item.phone || '', message: item.message || '',
+        source: item.source || 'Imported',
+        isValidEmail: validateEmail(item.email), isValidPhone: validatePhone(item.phone),
+        waStatus: 'Pending', emailStatus: 'Pending',
+        waDelivered: false, waRead: false, waReplied: false,
+        emailOpened: false, emailClicked: false, emailReplied: false,
+        tags: item.tags || [], createdAt: item.createdAt || new Date().toISOString().split('T')[0]
+      });
+      added++;
+    }
+  });
+  notifyClients({ type: 'refresh-all' });
+  res.json({ success: true, added: added });
+});
+
+app.post('/api/integrations/google-sheets/connect', (req, res) => {
+  const url = req.body.sheetUrl || '';
+  if (!url) return res.status(400).json({ error: 'Sheet URL required' });
+  connectedIntegrations.googleSheets = { connected: true, url: url };
+  res.json({ success: true });
+});
+
+app.post('/api/integrations/google-sheets/disconnect', (req, res) => {
+  connectedIntegrations.googleSheets = { connected: false, url: '' };
+  res.json({ success: true });
+});
+
+app.post('/api/integrations/whatsapp/connect', (req, res) => {
+  const num = req.body.number || '';
+  if (!num) return res.status(400).json({ error: 'Number required' });
+  connectedIntegrations.whatsapp = { connected: true, number: num };
+  res.json({ success: true });
+});
+
+app.post('/api/integrations/whatsapp/disconnect', (req, res) => {
+  connectedIntegrations.whatsapp = { connected: false, number: '' };
+  res.json({ success: true });
+});
+
 app.post('/api/webhook/:key', (req, res) => {
   const form = forms.find(f => f.accessKey === req.params.key);
   if (!form) return res.status(404).json({ error: 'Form not found' });
-  
   const newLead = {
-    id: Date.now().toString(),
-    formId: form.id,
-    name: req.body.name || 'Unknown',
-    email: req.body.email || '',
-    phone: req.body.phone || '',
-    message: req.body.message || '',
+    id: Date.now().toString(), formId: form.id,
+    name: req.body.name || 'Unknown', email: req.body.email || '', phone: req.body.phone || '', message: req.body.message || '',
     source: 'Forms',
-    isValidEmail: validateEmail(req.body.email),
-    isValidPhone: validatePhone(req.body.phone),
+    isValidEmail: validateEmail(req.body.email), isValidPhone: validatePhone(req.body.phone),
     waStatus: 'Pending', emailStatus: 'Pending',
     waDelivered: false, waRead: false, waReplied: false,
     emailOpened: false, emailClicked: false, emailReplied: false,
     tags: [], createdAt: new Date().toISOString().split('T')[0]
   };
-  
   leads.push(newLead);
   form.submissions += 1;
-  
-  // ✅ Notify all dashboards instantly
   notifyClients({ type: 'new-lead', lead: newLead });
-  
   res.json({ success: true, lead: newLead });
 });
 
@@ -166,12 +272,7 @@ app.post('/api/integrations/:id/toggle', (req, res) => {
 });
 
 app.post('/api/wa-numbers', (req, res) => {
-  const n = {
-    id: Date.now().toString(),
-    number: req.body.number || '',
-    name: req.body.name || 'Unknown',
-    addedAt: new Date().toISOString().split('T')[0]
-  };
+  const n = { id: Date.now().toString(), number: req.body.number || '', name: req.body.name || 'Unknown', addedAt: new Date().toISOString().split('T')[0] };
   waNumbers.push(n);
   res.json(n);
 });
@@ -181,12 +282,7 @@ app.post('/api/wa-numbers/bulk', (req, res) => {
   let added = 0;
   list.forEach(item => {
     if (item.number && item.number.length === 10) {
-      waNumbers.push({
-        id: (Date.now() + Math.random()).toString(),
-        number: item.number,
-        name: item.name || 'Unknown',
-        addedAt: new Date().toISOString().split('T')[0]
-      });
+      waNumbers.push({ id: (Date.now() + Math.random()).toString(), number: item.number, name: item.name || 'Unknown', addedAt: new Date().toISOString().split('T')[0] });
       added++;
     }
   });
@@ -196,6 +292,20 @@ app.post('/api/wa-numbers/bulk', (req, res) => {
 app.delete('/api/wa-numbers/:id', (req, res) => {
   waNumbers = waNumbers.filter(n => n.id !== req.params.id);
   res.json({ success: true });
+});
+
+app.post('/api/wa-campaign', (req, res) => {
+  const campaign = {
+    id: Date.now().toString(),
+    name: req.body.name || 'Untitled',
+    message: req.body.message || '',
+    media: req.body.media || null,
+    mediaType: req.body.mediaType || null,
+    recipients: req.body.recipients || [],
+    createdAt: new Date().toISOString()
+  };
+  waCampaigns.push(campaign);
+  res.json({ success: true, campaign: campaign });
 });
 
 app.post('/api/wa-send', (req, res) => {
@@ -210,12 +320,7 @@ app.post('/api/wa-send', (req, res) => {
 });
 
 app.post('/api/email-contacts', (req, res) => {
-  const c = {
-    id: Date.now().toString(),
-    email: req.body.email || '',
-    name: req.body.name || 'Unknown',
-    company: req.body.company || '-'
-  };
+  const c = { id: Date.now().toString(), email: req.body.email || '', name: req.body.name || 'Unknown', company: req.body.company || '-' };
   emailContacts.push(c);
   res.json(c);
 });
@@ -225,12 +330,7 @@ app.post('/api/email-contacts/bulk', (req, res) => {
   let added = 0;
   list.forEach(item => {
     if (item.email && item.email.indexOf('@') > -1) {
-      emailContacts.push({
-        id: (Date.now() + Math.random()).toString(),
-        email: item.email,
-        name: item.name || 'Unknown',
-        company: item.company || '-'
-      });
+      emailContacts.push({ id: (Date.now() + Math.random()).toString(), email: item.email, name: item.name || 'Unknown', company: item.company || '-' });
       added++;
     }
   });
@@ -254,18 +354,16 @@ app.post('/api/email-send', (req, res) => {
   res.json({ success: true, sent: to.length });
 });
 
-// ===== FRONTEND =====
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/app.js', (req, res) => res.sendFile(path.join(__dirname, 'app.js')));
 
-// ===== START =====
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log('');
   console.log('========================================');
   console.log('  🚀 Leadkite is RUNNING!');
   console.log('========================================');
   console.log('');
-  console.log('  👉 http://localhost:3000');
+  console.log('  👉 http://localhost:' + PORT);
   console.log('');
 });
